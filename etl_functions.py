@@ -193,16 +193,29 @@ def create_immigration_calendar_dimension(df, output_data):
 
 
 # Perform quality checks here
-def quality_checks(df, table_name):
-    """Count checks on fact and dimension table to ensure completeness of data.
+def quality_checks(df, table_name, critical_columns):
+    """Perform quality checks on fact and dimension tables to ensure completeness of data.
 
     :param df: spark dataframe to check counts on
     :param table_name: corresponding name of table
+    :param critical_columns: list of columns that are critical for the table's integrity
     """
+    # Total count check
     total_count = df.count()
-
     if total_count == 0:
         print(f"Data quality check failed for {table_name} with zero records!")
+        return 1
     else:
         print(f"Data quality check passed for {table_name} with {total_count:,} records.")
+    
+    # Null value check for critical columns
+    null_counts = df.select([count(when(col(c).isNull(), c)).alias(c) for c in critical_columns]).collect()[0].asDict()
+    failed_columns = {col: count for col, count in null_counts.items() if count > 0}
+    
+    if failed_columns:
+        print(f"Data quality check failed for {table_name} with null values in columns: {failed_columns}")
+        return 1
+    else:
+        print(f"Data quality check passed for {table_name} with no null values in critical columns.")
+    
     return 0
